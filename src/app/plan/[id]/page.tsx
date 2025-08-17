@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import axios from "axios";
+import { exportElementToPDF, generateLessonPlanFilename } from "@/lib/pdf-export";
 
 
 interface LessonPlan {
@@ -65,7 +66,45 @@ export default function PlanDetailPage() {
     });
   };
 
-  
+  const exportToPDF = async () => {
+    let originalText = '';
+    try {
+      if (!plan) return;
+
+      // Show loading state
+      const button = document.getElementById('export-pdf-btn') as HTMLButtonElement;
+      if (button) {
+        originalText = button.textContent || '📄 Export PDF (ไทย/Eng)';
+        button.textContent = '🔄 กำลัง Export...';
+        button.disabled = true;
+      }
+
+      // Generate filename
+      const filename = generateLessonPlanFilename(plan.unit_name, plan.subject);
+
+      // Export to PDF
+      await exportElementToPDF({
+        elementId: 'lesson-plan-content',
+        filename,
+        scale: 1.5,
+        quality: 0.95
+      });
+
+      // Show success message
+      alert('✅ Export PDF สำเร็จ! / PDF exported successfully!');
+      
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('❌ เกิดข้อผิดพลาดในการสร้าง PDF กรุณาลองใหม่อีกครั้ง / Error generating PDF, please try again');
+    } finally {
+      // Restore button text
+      const button = document.getElementById('export-pdf-btn') as HTMLButtonElement;
+      if (button) {
+        button.textContent = originalText || '📄 Export PDF (ไทย/Eng)';
+        button.disabled = false;
+      }
+    }
+  };
 
   if (loading) {
     return (
@@ -129,6 +168,12 @@ export default function PlanDetailPage() {
     <>
       {/* Print styles */}
       <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+        
+        * {
+          font-family: 'Sarabun', 'Noto Sans Thai', 'Arial', sans-serif;
+        }
+        
         @media print {
           .no-print {
             display: none !important;
@@ -165,6 +210,43 @@ export default function PlanDetailPage() {
             max-width: 100% !important;
             height: auto !important;
           }
+        }
+        
+        /* PDF Export specific styles */
+        .pdf-export-mode {
+          background: white !important;
+          color: black !important;
+          font-family: 'Sarabun', 'Noto Sans Thai', 'Arial', sans-serif !important;
+        }
+        
+        .pdf-export-mode * {
+          font-family: 'Sarabun', 'Noto Sans Thai', 'Arial', sans-serif !important;
+          -webkit-print-color-adjust: exact;
+          color-adjust: exact;
+        }
+        
+        .pdf-export-mode .bg-gradient-to-r {
+          background: linear-gradient(to right, #2563eb, #7c3aed) !important;
+        }
+        
+        .pdf-export-mode .bg-blue-50 {
+          background-color: #eff6ff !important;
+        }
+        
+        .pdf-export-mode .bg-green-50 {
+          background-color: #f0fdf4 !important;
+        }
+        
+        .pdf-export-mode .bg-amber-50 {
+          background-color: #fffbeb !important;
+        }
+        
+        .pdf-export-mode .text-blue-600 {
+          color: #2563eb !important;
+        }
+        
+        .pdf-export-mode .text-green-600 {
+          color: #16a34a !important;
         }
       `}</style>
       
@@ -318,6 +400,13 @@ export default function PlanDetailPage() {
                     className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                   >
                     🖨️ พิมพ์แผนการสอน
+                  </button>
+                  <button
+                    onClick={exportToPDF}
+                    className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    id="export-pdf-btn"
+                  >
+                    📄 Export PDF (ไทย/Eng)
                   </button>
                 </div>
                 
