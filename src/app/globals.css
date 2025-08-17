@@ -1,2 +1,78 @@
 @import "tailwindcss";
 
+/* Fallback colors for PDF export compatibility */
+:root {
+  --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb;
+  --color-blue-700: #1d4ed8;
+  --color-green-500: #10b981;
+  --color-green-600: #059669;
+  --color-green-700: #047857;
+  --color-red-500: #ef4444;
+  --color-red-600: #dc2626;
+  --color-yellow-500: #f59e0b;
+  --color-yellow-600: #d97706;
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #4b5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1f2937;
+  --color-gray-900: #111827;
+}
+
+/* PDF export specific styles */
+@media print {
+  .pdf-export-safe {
+    background-color: var(--color-blue-500) !important;
+    color: white !important;
+  }
+  
+  .pdf-export-safe-bg {
+    background-color: var(--color-gray-50) !important;
+  }
+  
+  /* Override any oklch colors for print */
+  * {
+    color: var(--color-gray-900) !important;
+  }
+  
+  .bg-blue-600, .bg-blue-500 {
+    background-color: var(--color-blue-600) !important;
+  }
+  
+  .bg-green-600, .bg-green-500 {
+    background-color: var(--color-green-600) !important;
+  }
+  
+  .bg-red-600, .bg-red-500 {
+    background-color: var(--color-red-600) !important;
+  }
+}
+
+/* Line clamp utilities */
+.line-clamp-1 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+}
+
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.line-clamp-3 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
