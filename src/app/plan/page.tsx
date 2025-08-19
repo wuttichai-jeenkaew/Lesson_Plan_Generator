@@ -80,6 +80,7 @@ export default function PlansPage() {
       await fetchPlans();
       alert('✅ ลบแผนการสอนเรียบร้อยแล้ว');
       
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error('Delete error:', error);
       alert(`❌ เกิดข้อผิดพลาด: ${error.response?.data?.error || 'ไม่สามารถลบได้'}`);

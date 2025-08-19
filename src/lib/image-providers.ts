@@ -10,6 +10,7 @@ export async function searchUnsplash(query: string, perPage = 6): Promise<ImageI
       { headers: { Authorization: `Client-ID ${key}` }, params: {}, responseType: "json" }
     );
     const data = res.data;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (data.results ?? []).map((it: any) => ({
       url: it.urls?.regular,
       source: "unsplash",
@@ -28,6 +29,7 @@ export async function searchPixabay(query: string, perPage = 6): Promise<ImageIt
   try {
     const res = await axios.get(url, { responseType: "json" });
     const data = res.data;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (data.hits ?? []).map((hit: any) => ({
       url: hit.webformatURL || hit.largeImageURL,
       source: "pixabay",

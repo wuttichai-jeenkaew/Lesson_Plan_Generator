@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { lessonPlanInputSchema, lessonPlanSchema } from "@/lib/schemas";
+import { lessonPlanInputSchema } from "@/lib/schemas";
 import { supabaseBrowser, supabaseServer } from "@/lib/supabase";
 
 // GET: ดึงข้อมูลทั้งหมดพร้อม pagination และ filtering
@@ -62,8 +62,9 @@ export async function GET(req: NextRequest) {
       }
     });
     
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message || "Unknown error" }, { status: 500 });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
 
@@ -81,7 +82,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
     return NextResponse.json({ id: data.id });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message || "Unknown error" }, { status: 500 });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

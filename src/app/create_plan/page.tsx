@@ -1,15 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { lessonPlanInputSchema, type LessonPlanInput, type ImageItem } from "@/lib/schemas";
-import { supabaseBrowser } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 
 export default function NewPlanPage() {
-  const sb = useMemo(() => supabaseBrowser(), []);
   const router = useRouter();
 
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -50,7 +48,7 @@ export default function NewPlanPage() {
     { value: 'อื่นๆ', label: 'อื่นๆ' },
   ];
 
-  const { register, control, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } =
+  const { register, control, handleSubmit, watch, setValue, formState: { errors } } =
     useForm<LessonPlanInput>({
       resolver: zodResolver(lessonPlanInputSchema),
       defaultValues: {
@@ -65,8 +63,14 @@ export default function NewPlanPage() {
     });
 
 
-  const objectives = useFieldArray({ control, name: "objectives" as any });
-  const activities = useFieldArray({ control, name: "activities" as any });
+  const objectives = useFieldArray({ 
+    control, 
+    name: "objectives" as any
+  });
+  const activities = useFieldArray({ 
+    control, 
+    name: "activities" as any
+  });
   const unitName = watch("unit_name");
   const formValues = watch();
 
@@ -107,10 +111,11 @@ export default function NewPlanPage() {
         const parsed = JSON.parse(draft);
         Object.keys(parsed).forEach(key => {
           if (parsed[key] && key !== 'images') {
-            setValue(key as any, parsed[key]);
+            setValue(key as keyof LessonPlanInput, parsed[key]);
           }
         });
-      } catch (e) {
+      } catch (error) {
+        console.error('Failed to parse draft:', error);
         // Ignore invalid draft
       }
     }
@@ -133,7 +138,8 @@ export default function NewPlanPage() {
         setLoadingImg(true);
         const r = await axios.get(`/api/images?query=${encodeURIComponent(unitName)}`);
         setImageResults(r.data.images ?? []);
-      } catch (e) {
+      } catch (error) {
+        console.error('Failed to fetch images:', error);
         setImageResults([]);
       } finally {
         setLoadingImg(false);
@@ -200,13 +206,21 @@ export default function NewPlanPage() {
         router.push(`/plan/${result.id}`);
       }, 1000);
       
-    } catch (e: any) {
-      console.error('❌ Submit error:', e);
+    } catch (error: unknown) {
+      console.error('❌ Submit error:', error);
       setSubmitStatus('error');
-      if (e.response && e.response.data && e.response.data.error) {
-        setSubmitMessage(`❌ เกิดข้อผิดพลาด: ${e.response.data.error}`);
+      
+      if (axios.isAxiosError(error)) {
+        const responseData = error.response?.data;
+        if (responseData && typeof responseData === 'object' && 'error' in responseData) {
+          setSubmitMessage(`❌ เกิดข้อผิดพลาด: ${responseData.error}`);
+        } else {
+          setSubmitMessage(`❌ เกิดข้อผิดพลาด: ${error.message}`);
+        }
+      } else if (error instanceof Error) {
+        setSubmitMessage(`❌ เกิดข้อผิดพลาด: ${error.message}`);
       } else {
-        setSubmitMessage(`❌ เกิดข้อผิดพลาด: ${e.message || "ไม่สามารถบันทึกได้"}`);
+        setSubmitMessage(`❌ เกิดข้อผิดพลาด: ไม่สามารถบันทึกได้`);
       }
       
       // ล้าง error message หลัง 5 วินาที
@@ -376,6 +390,7 @@ export default function NewPlanPage() {
               ))}
             </div>
             <div className="flex gap-2 mt-3">
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
               <button type="button" className="btn-success" onClick={() => objectives.append("" as any)}>
                 ➕ เพิ่มจุดประสงค์
               </button>
@@ -424,6 +439,7 @@ export default function NewPlanPage() {
               ))}
             </div>
             <div className="flex gap-2 mt-3">
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
               <button type="button" className="btn-success" onClick={() => activities.append("" as any)}>
                 ➕ เพิ่มกิจกรรม
               </button>
@@ -525,6 +541,7 @@ export default function NewPlanPage() {
 
             {/* ถ้าบังคับต้องมีรูป ให้โชว์ error */}
             {errors.images && (
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               <p className="err">{(errors.images as any).message ?? "กรุณาเลือกรูปอย่างน้อย 1 รูป"}</p>
             )}
           </div>

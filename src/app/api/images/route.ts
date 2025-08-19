@@ -3,11 +3,15 @@ import { NextResponse } from "next/server";
 import { searchImages } from "@/lib/image-providers";
 
 // ==== Simple in-memory LRU cache (dev/PoC) ====
-type CacheEntry = { data: any; expiresAt: number };
+interface CacheEntry {
+  data: unknown;
+  expiresAt: number;
+}
+
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 นาที
 const MAX_ITEMS = 200;
-const globalAny: any = globalThis as any;
-const cache: Map<string, CacheEntry> = globalAny.__imgCache || new Map();
+const globalAny = globalThis as Record<string, unknown>;
+const cache: Map<string, CacheEntry> = (globalAny.__imgCache as Map<string, CacheEntry>) || new Map();
 if (!globalAny.__imgCache) globalAny.__imgCache = cache;
 
 function getCache(key: string) {
@@ -18,7 +22,7 @@ function getCache(key: string) {
   cache.delete(key); cache.set(key, e);
   return e.data;
 }
-function setCache(key: string, data: any) {
+function setCache(key: string, data: unknown) {
   if (cache.size >= MAX_ITEMS) {
     // delete oldest
     const firstKey = cache.keys().next().value;
@@ -30,7 +34,7 @@ function setCache(key: string, data: any) {
 // ==== Very basic rate limit per IP (dev/PoC) ====
 const RATE_WINDOW_MS = 60 * 1000; // 1 นาที
 const RATE_MAX = 30; // 30 req/นาที/ไอพี
-const rlStore: Map<string, number[]> = globalAny.__imgRate || new Map();
+const rlStore: Map<string, number[]> = (globalAny.__imgRate as Map<string, number[]>) || new Map();
 if (!globalAny.__imgRate) globalAny.__imgRate = rlStore;
 
 function getIP(req: Request) {
@@ -62,7 +66,8 @@ export async function GET(req: Request) {
     const images = await searchImages(query);
     setCache(key, images);
     return NextResponse.json({ images, cached: false });
-  } catch (e) {
+  } catch (error) {
+    console.error('Image search error:', error);
     return NextResponse.json({ images: [] }, { status: 500 });
   }
 }

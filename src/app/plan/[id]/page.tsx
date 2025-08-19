@@ -42,6 +42,7 @@ export default function PlanDetailPage() {
         setPlan(response.data);
       } catch (err: unknown) {
         console.error('Error fetching plan:', err);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if ((err as any)?.response?.status === 404) {
           setError("ไม่พบแผนการสอนที่คุณต้องการ");
         } else {
@@ -102,6 +103,7 @@ const toThaiNumber = (num: number): string => {
       alert('✅ ลบแผนการสอนเรียบร้อยแล้ว');
       router.push('/plan');
       
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error('Delete error:', error);
       alert(`❌ เกิดข้อผิดพลาด: ${error.response?.data?.error || 'ไม่สามารถลบได้'}`);
