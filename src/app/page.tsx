@@ -106,7 +106,7 @@ export default function Home() {
             เริ่มสร้างแผนการเรียนรู้ที่มีคุณภาพสำหรับนักเรียนของคุณวันนี้
           </p>
           <Link
-            href="/plans"
+            href="/create_plan"
             className="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-blue-600 bg-white hover:bg-gray-50 transition-all duration-200 transform hover:scale-105"
           >
             เริ่มสร้างแผนการเรียนรู้
