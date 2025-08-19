@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState, useRef } from "react";
+import { useReactToPrint } from "react-to-print";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import axios from "axios";
-import { exportElementToPDF, generateLessonPlanFilename } from "@/lib/pdf-export";
-
 
 interface LessonPlan {
   id: string;
@@ -21,13 +20,13 @@ interface LessonPlan {
     alt?: string;
     attribution?: string;
   }>;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export default function PlanDetailPage() {
+  const printRef = useRef<HTMLDivElement>(null);
   const params = useParams() as { id: string };
-  const router = useRouter();
   const [plan, setPlan] = useState<LessonPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,9 +38,9 @@ export default function PlanDetailPage() {
         setError(null);
         const response = await axios.get(`/api/lesson_plans/${params.id}`);
         setPlan(response.data);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error fetching plan:', err);
-        if (err.response?.status === 404) {
+        if ((err as any)?.response?.status === 404) {
           setError("ไม่พบแผนการสอนที่คุณต้องการ");
         } else {
           setError("เกิดข้อผิดพลาดในการโหลดข้อมูล");
@@ -56,8 +55,12 @@ export default function PlanDetailPage() {
     }
   }, [params.id]);
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('th-TH', {
+  // ปรับปรุง formatDate ให้รองรับกรณีไม่มีข้อมูลหรือข้อมูลผิดรูปแบบ
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "-";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "-";
+    return date.toLocaleDateString('th-TH', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -66,45 +69,20 @@ export default function PlanDetailPage() {
     });
   };
 
-  const exportToPDF = async () => {
-    let originalText = '';
-    try {
-      if (!plan) return;
+const toThaiNumber = (num: number): string => {
+  const thaiDigits = ['๐','๑','๒','๓','๔','๕','๖','๗','๘','๙'];
+  return num
+    .toString()
+    .split('')
+    .map(digit => thaiDigits[parseInt(digit, 10)])
+    .join('');
+}
 
-      // Show loading state
-      const button = document.getElementById('export-pdf-btn') as HTMLButtonElement;
-      if (button) {
-        originalText = button.textContent || '📄 Export PDF (ไทย/Eng)';
-        button.textContent = '🔄 กำลัง Export...';
-        button.disabled = true;
-      }
-
-      // Generate filename
-      const filename = generateLessonPlanFilename(plan.unit_name, plan.subject);
-
-      // Export to PDF
-      await exportElementToPDF({
-        elementId: 'lesson-plan-content',
-        filename,
-        scale: 1.5,
-        quality: 0.95
-      });
-
-      // Show success message
-      alert('✅ Export PDF สำเร็จ! / PDF exported successfully!');
-      
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      alert('❌ เกิดข้อผิดพลาดในการสร้าง PDF กรุณาลองใหม่อีกครั้ง / Error generating PDF, please try again');
-    } finally {
-      // Restore button text
-      const button = document.getElementById('export-pdf-btn') as HTMLButtonElement;
-      if (button) {
-        button.textContent = originalText || '📄 Export PDF (ไทย/Eng)';
-        button.disabled = false;
-      }
-    }
-  };
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: plan ? `แผนการสอน_${plan.unit_name}` : undefined,
+    removeAfterPrint: true,
+  });
 
   if (loading) {
     return (
@@ -169,255 +147,270 @@ export default function PlanDetailPage() {
       {/* Print styles */}
       <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
-        
         * {
           font-family: 'Sarabun', 'Noto Sans Thai', 'Arial', sans-serif;
         }
-        
+        /* Screen styles for images */
+        .image-container img {
+          max-width: 100%;
+          height: auto;
+          object-fit: contain;
+          border-radius: 8px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
         @media print {
           .no-print {
             display: none !important;
           }
-          
           body {
-            font-size: 12pt;
-            line-height: 1.4;
+            font-size: 14pt;
+            line-height: 1.6;
+            color: #000;
           }
-          
           #lesson-plan-content {
             box-shadow: none !important;
             border: none !important;
             margin: 0 !important;
-            padding: 20pt !important;
+            padding: 40pt 60pt !important;
+            background: white !important;
           }
-          
           .page-break {
             page-break-before: always;
           }
-          
+          h1, h2, h3 {
+            color: #000 !important;
+            font-weight: bold !important;
+          }
           h1 {
+            font-size: 20pt;
+            margin-bottom: 12pt;
+            text-align: center;
+          }
+          h2 {
             font-size: 18pt;
             margin-bottom: 10pt;
+            text-align: center;
           }
-          
-          h2 {
-            font-size: 14pt;
-            margin-top: 15pt;
-            margin-bottom: 8pt;
+          h3 {
+            font-size: 16pt;
+            margin-top: 20pt;
+            margin-bottom: 10pt;
           }
-          
           img {
-            max-width: 100% !important;
+            max-width: 300pt !important;
+            max-height: 200pt !important;
+            width: auto !important;
             height: auto !important;
+            border: 1px solid #ccc !important;
+            object-fit: contain !important;
+            display: block !important;
+            margin: 0 auto !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
           }
-        }
-        
-        /* PDF Export specific styles */
-        .pdf-export-mode {
-          background: white !important;
-          color: black !important;
-          font-family: 'Sarabun', 'Noto Sans Thai', 'Arial', sans-serif !important;
-        }
-        
-        .pdf-export-mode * {
-          font-family: 'Sarabun', 'Noto Sans Thai', 'Arial', sans-serif !important;
-          -webkit-print-color-adjust: exact;
-          color-adjust: exact;
-        }
-        
-        .pdf-export-mode .bg-gradient-to-r {
-          background: linear-gradient(to right, #2563eb, #7c3aed) !important;
-        }
-        
-        .pdf-export-mode .bg-blue-50 {
-          background-color: #eff6ff !important;
-        }
-        
-        .pdf-export-mode .bg-green-50 {
-          background-color: #f0fdf4 !important;
-        }
-        
-        .pdf-export-mode .bg-amber-50 {
-          background-color: #fffbeb !important;
-        }
-        
-        .pdf-export-mode .text-blue-600 {
-          color: #2563eb !important;
-        }
-        
-        .pdf-export-mode .text-green-600 {
-          color: #16a34a !important;
+          .image-container {
+            text-align: center !important;
+            page-break-inside: avoid !important;
+            margin-bottom: 20pt !important;
+            border: 1px solid #ccc !important;
+            padding: 10pt !important;
+          }
+          .grid {
+            display: block !important;
+          }
+          .grid > * {
+            margin-bottom: 25pt !important;
+            page-break-inside: avoid !important;
+          }
+          /* Force media section to start on new page */
+          .media-section {
+            page-break-before: always !important;
+            margin-top: 0 !important;
+          }
+          /* Make metadata visible in print */
+          .metadata-section {
+            color: #666 !important;
+            font-size: 10pt !important;
+            page-break-inside: avoid !important;
+          }
         }
       `}</style>
-      
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          {/* Breadcrumb */}
-          <nav className="mb-6 no-print">
-            <Link
-              href="/plan"
-              className="inline-flex items-center text-blue-600 hover:text-blue-800 transition-colors"
-            >
-              ← กลับไปหน้ารายการแผนการสอน
-            </Link>
-          </nav>
-
-          {/* Main Content */}
-          <div id="lesson-plan-content" className="bg-white rounded-lg shadow-lg overflow-hidden">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-8">
-              <h1 className="text-3xl font-bold mb-4">{plan.unit_name}</h1>
-              <div className="flex flex-wrap gap-4 text-blue-100">
-                <span className="inline-flex items-center px-3 py-1 bg-white/20 rounded-full text-sm">
-                  📚 ระดับ: {plan.level}
-                </span>
-                <span className="inline-flex items-center px-3 py-1 bg-white/20 rounded-full text-sm">
-                  📖 วิชา: {plan.subject}
-                </span>
-                <span className="inline-flex items-center px-3 py-1 bg-white/20 rounded-full text-sm">
-                  📅 สร้างเมื่อ: {formatDate(plan.created_at)}
-                </span>
+      <div className="min-h-screen bg-gray-50">
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-4xl mx-auto">
+            {/* Breadcrumb */}
+            <nav className="mb-6 no-print">
+              <Link
+                href="/plan"
+                className="inline-flex items-center text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                ← กลับไปหน้ารายการแผนการสอน
+              </Link>
+            </nav>
+            {/* Main Content */}
+            <div ref={printRef} id="lesson-plan-content" className="bg-white shadow-lg overflow-hidden">
+              {/* Official Header */}
+              <div className="text-center border-b-2 border-gray-800 pb-6 mb-8">
+                <div className="mb-4">
+                  <h1 className="text-2xl font-bold text-gray-800 mb-2">แผนการจัดการเรียนรู้</h1>
+                  <h2 className="text-xl font-semibold text-gray-700">{plan.unit_name}</h2>
+                  <p className="text-sm text-gray-500 mt-2">เลขที่เอกสาร: {plan.id ? plan.id.substring(0, 8).toUpperCase() : 'N/A'}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-8 text-left max-w-2xl mx-auto">
+                  <div>
+                    <p className="mb-2"><span className="font-semibold">ระดับชั้น:</span> {plan.level}</p>
+                    <p className="mb-2"><span className="font-semibold">วิชา:</span> {plan.subject}</p>
+                  </div>
+                  <div>
+                    <p className="mb-2"><span className="font-semibold">วันที่จัดทำ:</span> {formatDate(plan.created_at)}</p>
+                    <p className="mb-2"><span className="font-semibold">ผู้จัดทำ:</span> ________________________</p>
+                  </div>
+                </div>
               </div>
-            </div>
-
-            {/* Content */}
-            <div className="p-8 space-y-8">
-              {/* Objectives */}
-              <section>
-                <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                  🎯 จุดประสงค์การเรียนรู้
-                </h2>
-                <div className="bg-blue-50 rounded-lg p-6">
-                  <ul className="space-y-3">
-                    {plan.objectives.map((objective, index) => (
-                      <li key={index} className="flex items-start">
-                        <span className="inline-flex items-center justify-center w-6 h-6 bg-blue-600 text-white text-sm rounded-full mr-3 mt-0.5 flex-shrink-0">
-                          {index + 1}
-                        </span>
-                        <span className="text-gray-700 leading-relaxed">{objective}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </section>
-
-              {/* Activities */}
-              <section>
-                <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                  📝 กิจกรรมการเรียนการสอน
-                </h2>
-                <div className="bg-green-50 rounded-lg p-6">
-                  <ol className="space-y-4">
-                    {plan.activities.map((activity, index) => (
-                      <li key={index} className="flex items-start">
-                        <span className="inline-flex items-center justify-center w-8 h-8 bg-green-600 text-white font-semibold rounded-full mr-4 mt-0.5 flex-shrink-0">
-                          {index + 1}
-                        </span>
-                        <div className="flex-1">
-                          <p className="text-gray-700 leading-relaxed">{activity}</p>
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-              </section>
-
-              {/* Assessment */}
-              <section>
-                <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                  📊 การประเมินผล
-                </h2>
-                <div className="bg-amber-50 rounded-lg p-6 border-l-4 border-amber-400">
-                  <p className="text-gray-700 leading-relaxed whitespace-pre-line">{plan.assessment}</p>
-                </div>
-              </section>
-
-              {/* Images */}
-              {plan.images && plan.images.length > 0 && (
+              {/* Content */}
+              <div className="p-8 space-y-8">
+                {/* Objectives */}
                 <section>
-                  <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                    🖼️ สื่อการเรียนการสอน
-                  </h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {plan.images.map((image, index) => (
-                      <div key={index} className="bg-gray-50 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={image.url}
-                          alt={image.alt || `สื่อการเรียนการสอน ${index + 1}`}
-                          className="w-full h-48 object-cover"
-                        />
-                        {image.attribution && (
-                          <div className="p-3">
-                            <p className="text-xs text-gray-500">
-                              📷 {image.attribution}
-                            </p>
-                            {image.source && (
-                              <p className="text-xs text-gray-400 mt-1">
-                                แหล่งที่มา: {image.source}
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                  <h3 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-300 pb-2">
+                    ๑. จุดประสงค์การเรียนรู้
+                  </h3>
+                  <div className="ml-4">
+                    <ol className="space-y-2 list-none">
+                      {plan.objectives.map((objective, index) => (
+                        <li key={index} className="flex items-start">
+                          <span className="text-gray-600 mr-3 mt-0.5 flex-shrink-0 min-w-[2rem]">
+                            ๑.{toThaiNumber(index + 1)}
+                          </span>
+                          <span className="text-gray-700 leading-relaxed">{objective}</span>
+                        </li>
+                      ))}
+                    </ol>
                   </div>
                 </section>
-              )}
 
-              {/* Metadata */}
-              <section className="border-t border-gray-200 pt-6">
-                <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-                  <span>🆔 ID: {plan.id}</span>
-                  <span>📅 สร้างเมื่อ: {formatDate(plan.created_at)}</span>
-                  {plan.updated_at !== plan.created_at && (
-                    <span>✏️ แก้ไขล่าสุด: {formatDate(plan.updated_at)}</span>
-                  )}
+                {/* Activities */}
+                <section>
+                  <h3 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-300 pb-2">
+                    ๒. กิจกรรมการเรียนการสอน
+                  </h3>
+                  <div className="ml-4">
+                    <ol className="space-y-4 list-none">
+                      {plan.activities.map((activity, index) => (
+                        <li key={index} className="flex items-start">
+                          <span className="text-gray-600 mr-3 mt-0.5 flex-shrink-0 min-w-[2rem]">
+                            ๒.{toThaiNumber(index + 1)}
+                          </span>
+                          <div className="flex-1">
+                            <p className="text-gray-700 leading-relaxed">{activity}</p>
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                </section>
+
+                {/* Assessment */}
+                <section>
+                  <h3 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-300 pb-2">
+                    ๓. การประเมินผล
+                  </h3>
+                  <div className="ml-4">
+                    <p className="text-gray-700 leading-relaxed whitespace-pre-line">{plan.assessment}</p>
+                  </div>
+                </section>
+
+                {/* Images */}
+                {plan.images && plan.images.length > 0 && (
+                  <section className="media-section">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-300 pb-2">
+                      ๔. สื่อการเรียนการสอน
+                    </h3>
+                    <div className="ml-4 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      {plan.images.map((image, index) => (
+                        <div key={index} className="image-container border border-gray-300 p-4">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={image.url}
+                            alt={image.alt || `สื่อการเรียนการสอน ${index + 1}`}
+                            className="w-full h-48 object-contain mb-3"
+                            style={{
+                              maxWidth: '300px',
+                              maxHeight: '200px',
+                              margin: '0 auto',
+                              display: 'block'
+                            }}
+                          />
+                          <p className="text-sm text-center text-gray-700 font-medium">
+                            รูปที่ {toThaiNumber(index + 1)}: {image.alt || `สื่อการเรียนการสอน ${index + 1}`}
+                          </p>
+                          {image.attribution && (
+                            <p className="text-xs text-gray-500 text-center mt-2">
+                              ที่มา: {image.attribution}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* Signature Section */}
+                <section className="mt-12 pt-8">
+                  <div className="grid grid-cols-2 gap-8">
+                    <div className="text-center">
+                      <p className="mb-8">ลงชื่อ ________________________ ผู้จัดทำ</p>
+                      <p>( ________________________ )</p>
+                      <p className="mt-2">วันที่ _____ / _____ / _____</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="mb-8">ลงชื่อ ________________________ หัวหน้าสถานศึกษา</p>
+                      <p>( ________________________ )</p>
+                      <p className="mt-2">วันที่ _____ / _____ / _____</p>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Metadata for reference only */}
+                <section className="metadata-section border-t border-gray-200 pt-6 text-xs text-gray-400">
+                  <div className="flex flex-wrap gap-4">
+                    <span>เลขที่เอกสาร: {plan.id ? plan.id.substring(0, 8).toUpperCase() : 'N/A'}</span>
+                    <span>จัดทำโดยระบบ: {formatDate(plan.created_at)}</span>
+                    {plan.updated_at && plan.updated_at !== plan.created_at && (
+                      <span>แก้ไขล่าสุด: {formatDate(plan.updated_at)}</span>
+                    )}
+                  </div>
+                </section>
+              </div>
+              {/* Actions */}
+              <div className="bg-gray-50 px-8 py-6 border-t border-gray-200 no-print">
+                <div className="flex flex-wrap gap-4 items-center justify-between">
+                  {/* Navigation buttons */}
+                  <div className="flex flex-wrap gap-4">
+                    <Link
+                      href="/plan"
+                      className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                    >
+                      ← กลับไปหน้ารายการ
+                    </Link>
+                    <Link
+                      href="/plans"
+                      className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      ➕ สร้างแผนการสอนใหม่
+                    </Link>
+                    <button
+                      onClick={handlePrint}
+                      className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                      🖨️ พิมพ์แผนการสอน
+                    </button>
+                  </div>
                 </div>
-              </section>
-            </div>
-
-            {/* Actions */}
-            <div className="bg-gray-50 px-8 py-6 border-t border-gray-200 no-print">
-              <div className="flex flex-wrap gap-4 items-center justify-between">
-                {/* Navigation buttons */}
-                <div className="flex flex-wrap gap-4">
-                  <Link
-                    href="/plan"
-                    className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                  >
-                    ← กลับไปหน้ารายการ
-                  </Link>
-                  <Link
-                    href="/plans"
-                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    ➕ สร้างแผนการสอนใหม่
-                  </Link>
-                  <button
-                    onClick={() => window.print()}
-                    className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    🖨️ พิมพ์แผนการสอน
-                  </button>
-                  <button
-                    onClick={exportToPDF}
-                    className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    id="export-pdf-btn"
-                  >
-                    📄 Export PDF (ไทย/Eng)
-                  </button>
-                </div>
-                
-
-
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
     </>
   );
 }
