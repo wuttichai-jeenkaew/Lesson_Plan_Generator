@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useReactToPrint } from "react-to-print";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import axios from "axios";
 
@@ -27,9 +27,11 @@ interface LessonPlan {
 export default function PlanDetailPage() {
   const printRef = useRef<HTMLDivElement>(null);
   const params = useParams() as { id: string };
+  const router = useRouter();
   const [plan, setPlan] = useState<LessonPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     const fetchPlan = async () => {
@@ -81,8 +83,32 @@ const toThaiNumber = (num: number): string => {
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: plan ? `แผนการสอน_${plan.unit_name}` : undefined,
-    removeAfterPrint: true,
   });
+
+  const handleDelete = async () => {
+    if (!plan) return;
+    
+    const confirmDelete = window.confirm(
+      `คุณต้องการลบแผนการสอน "${plan.unit_name}" หรือไม่?\n\nการดำเนินการนี้ไม่สามารถย้อนกลับได้`
+    );
+    
+    if (!confirmDelete) return;
+    
+    try {
+      setDeleteLoading(true);
+      await axios.delete(`/api/lesson_plans/${params.id}`);
+      
+      // แสดงข้อความสำเร็จและ redirect
+      alert('✅ ลบแผนการสอนเรียบร้อยแล้ว');
+      router.push('/plan');
+      
+    } catch (error: any) {
+      console.error('Delete error:', error);
+      alert(`❌ เกิดข้อผิดพลาด: ${error.response?.data?.error || 'ไม่สามารถลบได้'}`);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -393,16 +419,34 @@ const toThaiNumber = (num: number): string => {
                       ← กลับไปหน้ารายการ
                     </Link>
                     <Link
-                      href="/plans"
+                      href="/create_plan"
                       className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                     >
                       ➕ สร้างแผนการสอนใหม่
                     </Link>
+                  </div>
+                  
+                  {/* Action buttons */}
+                  <div className="flex flex-wrap gap-4">
                     <button
                       onClick={handlePrint}
                       className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                     >
                       🖨️ พิมพ์แผนการสอน
+                    </button>
+                    <button
+                      onClick={handleDelete}
+                      disabled={deleteLoading}
+                      className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {deleteLoading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          กำลังลบ...
+                        </>
+                      ) : (
+                        '🗑️ ลบแผนการสอน'
+                      )}
                     </button>
                   </div>
                 </div>

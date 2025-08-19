@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { lessonPlanSchema } from "@/lib/schemas";
+import { lessonPlanInputSchema, lessonPlanSchema } from "@/lib/schemas";
 import { supabaseBrowser, supabaseServer } from "@/lib/supabase";
 
 // GET: ดึงข้อมูลทั้งหมดพร้อม pagination และ filtering
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const parse = lessonPlanSchema.safeParse(body);
+    const parse = lessonPlanInputSchema.safeParse(body);
     if (!parse.success) {
       return NextResponse.json({ error: "Invalid data", details: parse.error.issues }, { status: 400 });
     }

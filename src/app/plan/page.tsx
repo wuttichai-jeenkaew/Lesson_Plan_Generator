@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import axios from 'axios';
 
 
 interface LessonPlan {
@@ -53,6 +54,7 @@ export default function PlansPage() {
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [allPlansForFilters, setAllPlansForFilters] = useState<LessonPlan[]>([]);
   const [selectedPlans, setSelectedPlans] = useState<string[]>([]);
+  const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
   
   const [filters, setFilters] = useState<FilterState>({
     level: '',
@@ -61,6 +63,67 @@ export default function PlansPage() {
     sortBy: 'created_at',
     sortOrder: 'desc'
   });
+
+  // ฟังก์ชันลบแผนการสอน
+  const handleDelete = async (id: string, unitName: string) => {
+    const confirmDelete = window.confirm(
+      `คุณต้องการลบแผนการสอน "${unitName}" หรือไม่?\n\nการดำเนินการนี้ไม่สามารถย้อนกลับได้`
+    );
+    
+    if (!confirmDelete) return;
+    
+    try {
+      setDeleteLoading(id);
+      await axios.delete(`/api/lesson_plans/${id}`);
+      
+      // รีเฟรชข้อมูล
+      await fetchPlans();
+      alert('✅ ลบแผนการสอนเรียบร้อยแล้ว');
+      
+    } catch (error: any) {
+      console.error('Delete error:', error);
+      alert(`❌ เกิดข้อผิดพลาด: ${error.response?.data?.error || 'ไม่สามารถลบได้'}`);
+    } finally {
+      setDeleteLoading(null);
+    }
+  };
+
+  // ฟังก์ชันดึงข้อมูล (แยกออกมาเพื่อให้เรียกใช้ได้)
+  const fetchPlans = async () => {
+    try {
+      setLoading(true);
+      
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: ITEMS_PER_PAGE.toString(),
+        sortBy: filters.sortBy,
+        sortOrder: filters.sortOrder
+      });
+
+      // เพิ่ม filter parameters หากมี
+      if (filters.level) params.append('level', filters.level);
+      if (filters.subject) params.append('subject', filters.subject);
+      if (filters.search) params.append('search', filters.search);
+
+      const response = await fetch(`/api/lesson_plans?${params}`);
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch plans');
+      }
+
+      const result: ApiResponse = await response.json();
+      setPlans(result.data);
+      setPagination(result.pagination);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching plans:', err);
+      setError('ไม่สามารถดึงข้อมูลแผนการเรียนรู้ได้');
+      setPlans([]);
+      setPagination(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // ดึงข้อมูลแผนการเรียนรู้ทั้งหมดเพื่อใช้สำหรับ filter options
   useEffect(() => {
@@ -81,38 +144,6 @@ export default function PlansPage() {
 
   // ดึงข้อมูลแผนการเรียนรู้แบบ pagination พร้อม filters
   useEffect(() => {
-    const fetchPlans = async () => {
-      try {
-        setLoading(true);
-        
-        const params = new URLSearchParams({
-          page: currentPage.toString(),
-          limit: ITEMS_PER_PAGE.toString(),
-          sortBy: filters.sortBy,
-          sortOrder: filters.sortOrder
-        });
-
-        // เพิ่ม filter parameters หากมี
-        if (filters.level) params.append('level', filters.level);
-        if (filters.subject) params.append('subject', filters.subject);
-        if (filters.search) params.append('search', filters.search);
-
-        const response = await fetch(`/api/lesson_plans?${params}`);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch lesson plans');
-        }
-        
-        const result: ApiResponse = await response.json();
-        setPlans(result.data);
-        setPagination(result.pagination);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchPlans();
   }, [currentPage, filters]);
 
@@ -413,16 +444,29 @@ export default function PlansPage() {
                     <strong>จุดประสงค์:</strong> {plan.objectives.join(', ')}
                   </p>
                   
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-center gap-2">
                     <span className="text-sm text-gray-500">
                       {plan.activities.length} กิจกรรม
                     </span>
-                    <Link
-                      href={`/plan/${plan.id}`}
-                      className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
-                    >
-                      ดูรายละเอียด
-                    </Link>
+                    <div className="flex gap-2">
+                      <Link
+                        href={`/plan/${plan.id}`}
+                        className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+                      >
+                        📄 ดู
+                      </Link>
+                      <button
+                        onClick={() => handleDelete(plan.id, plan.unit_name)}
+                        disabled={deleteLoading === plan.id}
+                        className="px-3 py-1.5 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {deleteLoading === plan.id ? (
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                        ) : (
+                          '🗑️'
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

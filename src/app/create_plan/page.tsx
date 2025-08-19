@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { lessonPlanSchema, type LessonPlanInput, type ImageItem } from "@/lib/schemas";
+import { lessonPlanInputSchema, type LessonPlanInput, type ImageItem } from "@/lib/schemas";
 import { supabaseBrowser } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import axios from "axios";
@@ -52,7 +52,7 @@ export default function NewPlanPage() {
 
   const { register, control, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } =
     useForm<LessonPlanInput>({
-      resolver: zodResolver(lessonPlanSchema),
+      resolver: zodResolver(lessonPlanInputSchema),
       defaultValues: {
         level: "",
         subject: "",
@@ -94,7 +94,7 @@ export default function NewPlanPage() {
         localStorage.setItem('lesson_plan_draft', JSON.stringify(formValues));
         setTimeout(() => setAutoSaving(false), 1000);
       }
-    }, 2000);
+    }, 10000);
 
     return () => clearTimeout(autoSaveTimer);
   }, [formValues]);
@@ -117,9 +117,7 @@ export default function NewPlanPage() {
   }, [setValue]);
 
   // Clear draft after successful submission
-  const clearDraft = () => {
-    localStorage.removeItem('lesson_plan_draft');
-  };
+
 
   const [imageResults, setImageResults] = useState<ImageItem[]>([]);
   const [loadingImg, setLoadingImg] = useState(false);
@@ -175,7 +173,7 @@ export default function NewPlanPage() {
     console.log('🧹 Cleaned values:', cleanedValues);
     
     // ตรวจสอบ validation ก่อนส่ง
-    const validation = lessonPlanSchema.safeParse(cleanedValues);
+    const validation = lessonPlanInputSchema.safeParse(cleanedValues);
     if (!validation.success) {
       console.error('❌ Validation failed:', validation.error.issues);
       setSubmitStatus('error');
@@ -194,9 +192,9 @@ export default function NewPlanPage() {
       
       setSubmitStatus('success');
       setSubmitMessage('✅ บันทึกแผนการสอนสำเร็จ!');
-      clearDraft(); // Clear saved draft
+
       
-      // รอ 1.5 วินาทีแล้วไปหน้า plan detail
+
       setTimeout(() => {
         console.log('🔄 Redirecting to:', `/plan/${result.id}`);
         router.push(`/plan/${result.id}`);
@@ -267,6 +265,20 @@ export default function NewPlanPage() {
 
         <form className="space-y-6" onSubmit={(e) => {
           console.log('📝 Form onSubmit triggered!', e);
+          e.preventDefault(); // ป้องกัน default behavior
+          
+          // เช็คว่า form มี error หรือไม่
+          const hasErrors = Object.keys(errors).length > 0;
+          console.log('🔍 Form errors:', errors);
+          console.log('❌ Has errors:', hasErrors);
+          
+          if (hasErrors) {
+            console.log('⚠️ Form has validation errors, not submitting');
+            setSubmitStatus('error');
+            setSubmitMessage('❌ กรุณาตรวจสอบข้อมูลให้ครบถ้วน');
+            return;
+          }
+          
           return handleSubmit(onSubmit)(e);
         }}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -521,6 +533,52 @@ export default function NewPlanPage() {
               className="btn-primary w-full text-lg font-semibold py-3 transition-all duration-200 hover:shadow-lg"
               disabled={submitStatus === 'loading'}
               type="submit"
+              onClick={(e) => {
+                console.log('🖱️ Submit button clicked!');
+                const formData = watch();
+                console.log('📋 Current form data:', formData);
+                console.log('❌ Current errors:', errors);
+                
+                // เช็คว่ามีข้อมูลพื้นฐานหรือไม่
+                if (!formData.level || !formData.subject || !formData.unit_name) {
+                  console.log('⚠️ Missing required basic fields');
+                  setSubmitStatus('error');
+                  setSubmitMessage('❌ กรุณากรอกข้อมูลพื้นฐาน: ระดับชั้น, วิชา, และชื่อหน่วยการเรียนรู้');
+                  e.preventDefault();
+                  return;
+                }
+                
+                // เช็คจุดประสงค์
+                const validObjectives = formData.objectives?.filter(obj => obj && obj.trim() !== '') || [];
+                if (validObjectives.length === 0) {
+                  console.log('⚠️ No valid objectives');
+                  setSubmitStatus('error');
+                  setSubmitMessage('❌ กรุณาเพิ่มจุดประสงค์การเรียนรู้อย่างน้อย 1 ข้อ');
+                  e.preventDefault();
+                  return;
+                }
+                
+                // เช็คกิจกรรม
+                const validActivities = formData.activities?.filter(act => act && act.trim() !== '') || [];
+                if (validActivities.length === 0) {
+                  console.log('⚠️ No valid activities');
+                  setSubmitStatus('error');
+                  setSubmitMessage('❌ กรุณาเพิ่มกิจกรรมการเรียนการสอนอย่างน้อย 1 ข้อ');
+                  e.preventDefault();
+                  return;
+                }
+                
+                // เช็คการประเมินผล
+                if (!formData.assessment || formData.assessment.trim() === '') {
+                  console.log('⚠️ No assessment');
+                  setSubmitStatus('error');
+                  setSubmitMessage('❌ กรุณากรอกวิธีการประเมินผล');
+                  e.preventDefault();
+                  return;
+                }
+                
+                console.log('✅ All validation passed, ready to submit');
+              }}
             >
               {submitStatus === 'loading' ? (
                 <div className="flex items-center justify-center gap-2">
@@ -536,16 +594,7 @@ export default function NewPlanPage() {
               💡 ระบบจะบันทึกข้อมูลและพาคุณไปยังหน้าแสดงผลแผนการสอนที่สร้างเสร็จแล้ว
             </p>
             
-            {/* Draft info */}
-            <div className="text-center mt-2">
-              <button
-                type="button"
-                className="text-xs text-gray-400 hover:text-gray-600 underline"
-                onClick={clearDraft}
-              >
-                ล้างแบบร่างที่บันทึกไว้
-              </button>
-            </div>
+      
           </div>
         </form>
       </div>
@@ -586,6 +635,8 @@ export default function NewPlanPage() {
           font-weight: 500;
           cursor: pointer;
           display: inline-block;
+          width: 35%;
+
         }
         .btn-primary { 
           background: #2563eb !important; 
